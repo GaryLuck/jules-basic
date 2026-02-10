@@ -5,7 +5,7 @@ A simple interpreter for a subset of the BASIC programming language, implemented
 ## Features
 
 - **Variables**: Single-letter variables `A` through `Z` (integer only).
-- **Arrays**: Single-letter arrays `A` through `Z`, declared using the `DIM` statement.
+- **Arrays**: Single-letter arrays `A` through `Z`, declared using the `DIM` statement. Supports both `()` and `[]` for indexing.
 - **Arithmetic**: Support for `+`, `-`, `*`, and `/`.
 - **Control Flow**: `GOTO` for unconditional jumps and `IF` for conditional jumps.
 - **Direct & Program Mode**: Execute statements immediately or enter them as part of a numbered program.
@@ -22,8 +22,8 @@ A simple interpreter for a subset of the BASIC programming language, implemented
 ## Statements
 
 - `PRINT <expression | string> [, ...]`: Prints values or strings.
-- `LET <variable> = <expression>`: Assigns a value to a variable or array element.
-- `DIM <array>[<size>]`: Declares an array of the specified size.
+- `LET <variable> = <expression>`: Assigns a value to a variable or array element (e.g., `LET A(1) = 10` or `LET A[1] = 10`).
+- `DIM <array>(<size>)`: Declares an array of the specified size (supports `()` or `[]`).
 - `GOTO <line_number>`: Jumps to the specified line number.
 - `IF <expression> <operator> <expression> [THEN] <statement>`: Executes a statement if the condition is true. Supported operators: `=`, `<`, `>`, `<=`, `>=`, `<>`, `!=`.
 - `END`: Terminates program execution.
