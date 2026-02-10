@@ -134,11 +134,12 @@ int parse_factor(void) {
         skip_whitespace();
         
         /* Check for array subscript */
-        if (*current_pos == '[') {
+        if (*current_pos == '[' || *current_pos == '(') {
+            char closing = (*current_pos == '[') ? ']' : ')';
             current_pos++;
             int index = parse_expression();
             skip_whitespace();
-            if (*current_pos == ']') {
+            if (*current_pos == closing) {
                 current_pos++;
             }
             
@@ -290,11 +291,12 @@ void execute_let(void) {
     skip_whitespace();
     
     /* Check for array assignment */
-    if (*current_pos == '[') {
+    if (*current_pos == '[' || *current_pos == '(') {
+        char closing = (*current_pos == '[') ? ']' : ')';
         current_pos++;
         int index = parse_expression();
         skip_whitespace();
-        if (*current_pos == ']') {
+        if (*current_pos == closing) {
             current_pos++;
         }
         
@@ -337,14 +339,16 @@ void execute_dim(void) {
     current_pos++;
     skip_whitespace();
     
-    if (*current_pos == '[') {
+    char closing = 0;
+    if (*current_pos == '[' || *current_pos == '(') {
+        closing = (*current_pos == '[') ? ']' : ')';
         current_pos++;
     }
     
     int size = parse_expression();
     skip_whitespace();
     
-    if (*current_pos == ']') {
+    if (closing && *current_pos == closing) {
         current_pos++;
     }
     
