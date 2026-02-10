@@ -9,6 +9,7 @@
 #define MAX_VARS 26
 #define MAX_ARRAYS 26
 #define MAX_ARRAY_SIZE 1000
+#define MAX_FOR_STACK 10
 
 /* Program storage */
 typedef struct {
@@ -31,6 +32,17 @@ typedef struct {
 
 Array arrays[MAX_ARRAYS];
 
+/* FOR loop stack */
+typedef struct {
+    char var_name;
+    int end_value;
+    int step_value;
+    int line_index;
+} ForStackEntry;
+
+ForStackEntry for_stack[MAX_FOR_STACK];
+int for_stack_ptr = 0;
+
 /* Parser state */
 char *current_pos;
 int current_line_index;
@@ -51,6 +63,9 @@ void execute_let(void);
 void execute_goto(void);
 void execute_if(void);
 void execute_dim(void);
+void execute_for(void);
+void execute_next(void);
+void skip_to_next(char var_name);
 int find_line(int line_number);
 void insert_line(int line_number, const char *text);
 void save_program(const char *filename);
@@ -74,6 +89,9 @@ void init_interpreter(void) {
         arrays[i].allocated = false;
     }
     
+    /* Reset FOR stack */
+    for_stack_ptr = 0;
+
     program_size = 0;
 }
 
@@ -352,6 +370,113 @@ void execute_dim(void) {
     arrays[arr_idx].allocated = true;
 }
 
+/* Execute FOR statement */
+void execute_for(void) {
+    skip_whitespace();
+    if (!isalpha(*current_pos)) {
+        fprintf(stderr, "Error: Expected variable name in FOR\n");
+        return;
+    }
+    char var_name = toupper(*current_pos);
+    current_pos++;
+    skip_whitespace();
+
+    if (*current_pos == '=') {
+        current_pos++;
+    }
+
+    int start_val = parse_expression();
+    skip_whitespace();
+
+    if (strncasecmp(current_pos, "TO", 2) != 0) {
+        fprintf(stderr, "Error: Expected TO in FOR\n");
+        return;
+    }
+    current_pos += 2;
+
+    int end_val = parse_expression();
+    skip_whitespace();
+
+    int step_val = 1;
+    if (strncasecmp(current_pos, "STEP", 4) == 0) {
+        current_pos += 4;
+        step_val = parse_expression();
+    }
+
+    /* Check if this loop is already on stack */
+    if (for_stack_ptr > 0 && for_stack[for_stack_ptr - 1].line_index == current_line_index) {
+        /* Re-entry from NEXT, variable already incremented */
+    } else {
+        /* Initial entry */
+        if (for_stack_ptr >= MAX_FOR_STACK) {
+            fprintf(stderr, "Error: FOR stack overflow\n");
+            return;
+        }
+        variables[var_name - 'A'] = start_val;
+        for_stack[for_stack_ptr].var_name = var_name;
+        for_stack[for_stack_ptr].end_value = end_val;
+        for_stack[for_stack_ptr].step_value = step_val;
+        for_stack[for_stack_ptr].line_index = current_line_index;
+        for_stack_ptr++;
+    }
+
+    /* Check condition */
+    int current_val = variables[var_name - 'A'];
+    bool done = false;
+    if (step_val > 0 && current_val > end_val) done = true;
+    else if (step_val < 0 && current_val < end_val) done = true;
+
+    if (done) {
+        for_stack_ptr--;
+        skip_to_next(var_name);
+    }
+}
+
+/* Execute NEXT statement */
+void execute_next(void) {
+    skip_whitespace();
+    if (!isalpha(*current_pos)) {
+        fprintf(stderr, "Error: Expected variable name in NEXT\n");
+        return;
+    }
+    char var_name = toupper(*current_pos);
+    current_pos++;
+
+    if (for_stack_ptr > 0 && for_stack[for_stack_ptr - 1].var_name == var_name) {
+        variables[var_name - 'A'] += for_stack[for_stack_ptr - 1].step_value;
+        current_line_index = for_stack[for_stack_ptr - 1].line_index - 1;
+    } else {
+        fprintf(stderr, "Error: NEXT without matching FOR\n");
+    }
+}
+
+/* Skip to matching NEXT statement */
+void skip_to_next(char var_name) {
+    int nesting = 0;
+    while (current_line_index < program_size) {
+        current_line_index++;
+        if (current_line_index >= program_size) break;
+
+        char *ptr = program[current_line_index].text;
+        while (*ptr && isspace(*ptr)) ptr++;
+
+        if (strncasecmp(ptr, "FOR", 3) == 0) {
+            nesting++;
+        } else if (strncasecmp(ptr, "NEXT", 4) == 0) {
+            if (nesting == 0) {
+                char *vptr = ptr + 4;
+                while (*vptr && isspace(*vptr)) vptr++;
+                if (toupper(*vptr) == var_name) {
+                    return;
+                }
+            } else {
+                nesting--;
+            }
+        }
+    }
+    fprintf(stderr, "Error: Matching NEXT %c not found\n", var_name);
+}
+
 /* Find line by line number */
 int find_line(int line_number) {
     int i;
@@ -455,6 +580,12 @@ void execute_line(int line_index) {
     } else if (strncasecmp(current_pos, "DIM", 3) == 0) {
         current_pos += 3;
         execute_dim();
+    } else if (strncasecmp(current_pos, "FOR", 3) == 0) {
+        current_pos += 3;
+        execute_for();
+    } else if (strncasecmp(current_pos, "NEXT", 4) == 0) {
+        current_pos += 4;
+        execute_next();
     } else if (strncasecmp(current_pos, "END", 3) == 0) {
         current_line_index = program_size; /* Exit program */
     } else if (*current_pos) {
@@ -633,6 +764,12 @@ int main(void) {
                 } else if (strncasecmp(current_pos, "DIM", 3) == 0) {
                     current_pos += 3;
                     execute_dim();
+                } else if (strncasecmp(current_pos, "FOR", 3) == 0) {
+                    current_pos += 3;
+                    execute_for();
+                } else if (strncasecmp(current_pos, "NEXT", 4) == 0) {
+                    current_pos += 4;
+                    execute_next();
                 } else {
                     printf("Unknown command or invalid syntax\n");
                 }
