@@ -447,6 +447,10 @@ void execute_input(void) {
             break;
         }
     }
+
+    /* Consume trailing newline */
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
 }
 
 /* Execute FOR statement */
