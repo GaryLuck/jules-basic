@@ -22,7 +22,7 @@ A simple interpreter for a subset of the BASIC programming language, implemented
 ## Statements
 
 - `PRINT <expression | string> [, ...]`: Prints values or strings.
-- `LET <variable> = <expression>`: Assigns a value to a variable or array element (e.g., `LET A(1) = 10` or `LET A[1] = 10`).
+- `LET <variable> = <expression>`: Assigns a value to a variable or array element (e.g., `LET A(1) = 10` or `LET A[1] = 10`). The `LET` keyword is optional.
 - `DIM <array>(<size>)`: Declares an array of the specified size (supports `()` or `[]`).
 - `GOTO <line_number>`: Jumps to the specified line number.
 - `IF <expression> <operator> <expression> [THEN] <statement>`: Executes a statement if the condition is true. Supported operators: `=`, `<`, `>`, `<=`, `>=`, `<>`, `!=`.
@@ -55,11 +55,11 @@ To start the interpreter:
 The following program calculates and prints the squares of numbers 0 through 4:
 
 ```basic
-10 LET A = 0
-20 DIM B[5]
-30 LET B[A] = A * A
-40 PRINT "SQUARE OF ", A, " IS ", B[A]
-50 LET A = A + 1
+10 A = 0
+20 DIM B(5)
+30 B(A) = A * A
+40 PRINT "SQUARE OF ", A, " IS ", B(A)
+50 A = A + 1
 60 IF A < 5 THEN GOTO 30
 70 END
 ```

@@ -628,6 +628,8 @@ int main(void) {
                 current_pos = input;
                 current_line_index = 0;
                 
+                skip_whitespace();
+
                 if (strncasecmp(current_pos, "PRINT", 5) == 0) {
                     current_pos += 5;
                     execute_print();
@@ -637,6 +639,9 @@ int main(void) {
                 } else if (strncasecmp(current_pos, "DIM", 3) == 0) {
                     current_pos += 3;
                     execute_dim();
+                } else if (isalpha(*current_pos)) {
+                    /* Assume it's a LET statement without LET keyword */
+                    execute_let();
                 } else {
                     printf("Unknown command or invalid syntax\n");
                 }
