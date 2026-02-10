@@ -63,6 +63,7 @@ void execute_let(void);
 void execute_goto(void);
 void execute_if(void);
 void execute_dim(void);
+void execute_input(void);
 void execute_for(void);
 void execute_next(void);
 void skip_to_next(char var_name);
@@ -374,6 +375,80 @@ void execute_dim(void) {
     arrays[arr_idx].allocated = true;
 }
 
+/* Execute INPUT statement */
+void execute_input(void) {
+    skip_whitespace();
+
+    if (*current_pos == '"') {
+        char *prompt = read_string_literal();
+        if (prompt) {
+            printf("%s", prompt);
+            fflush(stdout);
+        }
+
+        skip_whitespace();
+        if (*current_pos == ',') {
+            current_pos++;
+        }
+    }
+
+    while (1) {
+        skip_whitespace();
+        if (!*current_pos || *current_pos == '\n') {
+            break;
+        }
+
+        if (!isalpha(*current_pos)) {
+            fprintf(stderr, "Error: Expected variable name in INPUT\n");
+            return;
+        }
+
+        char var_name = toupper(*current_pos);
+        current_pos++;
+
+        int *target = NULL;
+
+        skip_whitespace();
+        if (*current_pos == '[' || *current_pos == '(') {
+            char closing = (*current_pos == '[') ? ']' : ')';
+            current_pos++;
+            int index = parse_expression();
+            skip_whitespace();
+            if (*current_pos == closing) {
+                current_pos++;
+            }
+
+            int arr_idx = var_name - 'A';
+            if (!arrays[arr_idx].allocated) {
+                fprintf(stderr, "Error: Array %c not dimensioned\n", var_name);
+                return;
+            }
+            if (index < 0 || index >= arrays[arr_idx].size) {
+                fprintf(stderr, "Error: Array index %d out of bounds for %c\n", index, var_name);
+                return;
+            }
+            target = &arrays[arr_idx].data[index];
+        } else {
+            target = &variables[var_name - 'A'];
+        }
+
+        if (target) {
+            if (scanf("%d", target) != 1) {
+                fprintf(stderr, "Error: Invalid input\n");
+                while(getchar() != '\n' && !feof(stdin));
+                return;
+            }
+        }
+
+        skip_whitespace();
+        if (*current_pos == ',') {
+            current_pos++;
+        } else {
+            break;
+        }
+    }
+}
+
 /* Execute FOR statement */
 void execute_for(void) {
     skip_whitespace();
@@ -584,6 +659,9 @@ void execute_line(int line_index) {
     } else if (strncasecmp(current_pos, "DIM", 3) == 0) {
         current_pos += 3;
         execute_dim();
+    } else if (strncasecmp(current_pos, "INPUT", 5) == 0) {
+        current_pos += 5;
+        execute_input();
     } else if (strncasecmp(current_pos, "FOR", 3) == 0) {
         current_pos += 3;
         execute_for();
@@ -768,6 +846,9 @@ int main(void) {
                 } else if (strncasecmp(current_pos, "DIM", 3) == 0) {
                     current_pos += 3;
                     execute_dim();
+                } else if (strncasecmp(current_pos, "INPUT", 5) == 0) {
+                    current_pos += 5;
+                    execute_input();
                 } else if (strncasecmp(current_pos, "FOR", 3) == 0) {
                     current_pos += 3;
                     execute_for();
