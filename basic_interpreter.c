@@ -313,7 +313,13 @@ void execute_print(void) {
             free(str);
         } else {
             current_pos = save_pos;
-            printf("%d", parse_expression());
+            char *before_parse = current_pos;
+            int val = parse_expression();
+            if (current_pos == before_parse) {
+                fprintf(stderr, "Error: Syntax error in PRINT statement\n");
+                break;
+            }
+            printf("%d", val);
         }
         
         skip_whitespace();
@@ -704,9 +710,15 @@ char *parse_string_operand(void) {
                         free(str);
                     }
                     return ret;
+                } else {
+                    fprintf(stderr, "Error: Expected ')' in LEFT$\n");
                 }
+            } else {
+                fprintf(stderr, "Error: Expected ',' in LEFT$\n");
             }
             if (str) free(str);
+        } else {
+            fprintf(stderr, "Error: Expected '(' after LEFT$\n");
         }
     } else if (strncasecmp(current_pos, "RIGHT$", 6) == 0) {
         current_pos += 6;
@@ -733,9 +745,15 @@ char *parse_string_operand(void) {
                         free(str);
                     }
                     return ret;
+                } else {
+                    fprintf(stderr, "Error: Expected ')' in RIGHT$\n");
                 }
+            } else {
+                fprintf(stderr, "Error: Expected ',' in RIGHT$\n");
             }
             if (str) free(str);
+        } else {
+            fprintf(stderr, "Error: Expected '(' after RIGHT$\n");
         }
     } else if (strncasecmp(current_pos, "MID$", 4) == 0) {
         current_pos += 4;
