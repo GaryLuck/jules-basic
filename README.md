@@ -39,7 +39,7 @@ A simple interpreter for a subset of the BASIC programming language, implemented
 To compile the interpreter, run:
 
 ```bash
-gcc basic_interpreter.c -o basic_interpreter
+gcc basic_interpreter.c -o basic_interpreter (or you can just call the output basic)
 ```
 
 ### Running
