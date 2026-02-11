@@ -75,6 +75,7 @@ void insert_line(int line_number, const char *text);
 void save_program(const char *filename);
 void load_program(const char *filename);
 char *read_string_literal(void);
+char *parse_string_operand(void);
 int get_array_index(char var_name);
 
 /* Initialize interpreter */
@@ -629,9 +630,67 @@ void execute_goto(void) {
     }
 }
 
+/* Parse string operand for comparison */
+char *parse_string_operand(void) {
+    skip_whitespace();
+    if (*current_pos == '"') {
+        char *s = read_string_literal();
+        if (s) {
+            char *ret = (char *)malloc(strlen(s) + 1);
+            if (ret) strcpy(ret, s);
+            return ret;
+        }
+    } else if (isalpha(*current_pos)) {
+         char *save_pos = current_pos;
+         char var = toupper(*current_pos++);
+         if (*current_pos == '$') {
+             current_pos++; /* skip $ */
+             int idx = var - 'A';
+             char *val = string_variables[idx];
+             if (val) {
+                 char *ret = (char *)malloc(strlen(val) + 1);
+                 if (ret) strcpy(ret, val);
+                 return ret;
+             } else {
+                 char *ret = (char *)malloc(1);
+                 if (ret) *ret = '\0';
+                 return ret;
+             }
+         }
+         current_pos = save_pos; /* backtrack */
+    }
+    return NULL;
+}
+
 /* Execute IF statement */
 void execute_if(void) {
-    int left = parse_expression();
+    skip_whitespace();
+
+    char *left_str = NULL;
+    char *right_str = NULL;
+    bool is_string_comp = false;
+
+    /* Check for string comparison */
+    if (*current_pos == '"') {
+        is_string_comp = true;
+    } else if (isalpha(*current_pos)) {
+        if (*(current_pos + 1) == '$') {
+            is_string_comp = true;
+        }
+    }
+
+    int left_val = 0;
+
+    if (is_string_comp) {
+        left_str = parse_string_operand();
+        if (!left_str) {
+             /* Should not happen due to check above, unless memory fail */
+             return;
+        }
+    } else {
+        left_val = parse_expression();
+    }
+
     skip_whitespace();
     
     char op[3] = {0};
@@ -645,22 +704,54 @@ void execute_if(void) {
         }
     }
     
-    int right = parse_expression();
+    int right_val = 0;
+
+    if (is_string_comp) {
+        right_str = parse_string_operand();
+        if (!right_str) {
+            fprintf(stderr, "Error: Type mismatch in IF\n");
+            if (left_str) free(left_str);
+            return;
+        }
+    } else {
+        right_val = parse_expression();
+    }
+
     bool condition = false;
     
-    /* Evaluate condition */
-    if (strcmp(op, "=") == 0 || strcmp(op, "==") == 0) {
-        condition = (left == right);
-    } else if (strcmp(op, "<") == 0) {
-        condition = (left < right);
-    } else if (strcmp(op, ">") == 0) {
-        condition = (left > right);
-    } else if (strcmp(op, "<=") == 0) {
-        condition = (left <= right);
-    } else if (strcmp(op, ">=") == 0) {
-        condition = (left >= right);
-    } else if (strcmp(op, "<>") == 0 || strcmp(op, "!=") == 0) {
-        condition = (left != right);
+    if (is_string_comp) {
+        int cmp = strcmp(left_str, right_str);
+        if (strcmp(op, "=") == 0 || strcmp(op, "==") == 0) {
+            condition = (cmp == 0);
+        } else if (strcmp(op, "<") == 0) {
+            condition = (cmp < 0);
+        } else if (strcmp(op, ">") == 0) {
+            condition = (cmp > 0);
+        } else if (strcmp(op, "<=") == 0) {
+            condition = (cmp <= 0);
+        } else if (strcmp(op, ">=") == 0) {
+            condition = (cmp >= 0);
+        } else if (strcmp(op, "<>") == 0 || strcmp(op, "!=") == 0) {
+            condition = (cmp != 0);
+        }
+
+        free(left_str);
+        free(right_str);
+    } else {
+        /* Evaluate integer condition */
+        if (strcmp(op, "=") == 0 || strcmp(op, "==") == 0) {
+            condition = (left_val == right_val);
+        } else if (strcmp(op, "<") == 0) {
+            condition = (left_val < right_val);
+        } else if (strcmp(op, ">") == 0) {
+            condition = (left_val > right_val);
+        } else if (strcmp(op, "<=") == 0) {
+            condition = (left_val <= right_val);
+        } else if (strcmp(op, ">=") == 0) {
+            condition = (left_val >= right_val);
+        } else if (strcmp(op, "<>") == 0 || strcmp(op, "!=") == 0) {
+            condition = (left_val != right_val);
+        }
     }
     
     /* Look for THEN or GOTO */
