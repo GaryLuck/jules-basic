@@ -23,6 +23,9 @@ int program_size = 0;
 /* Variables A-Z */
 int variables[MAX_VARS];
 
+/* String variables A-Z */
+char *string_variables[MAX_VARS];
+
 /* Arrays A-Z */
 typedef struct {
     int *data;
@@ -83,6 +86,11 @@ void init_interpreter(void) {
         variables[i] = 0;
     }
     
+    /* Initialize string variables */
+    for (i = 0; i < MAX_VARS; i++) {
+        string_variables[i] = NULL;
+    }
+
     /* Initialize arrays */
     for (i = 0; i < MAX_ARRAYS; i++) {
         arrays[i].data = NULL;
@@ -104,6 +112,12 @@ void cleanup_interpreter(void) {
             free(arrays[i].data);
             arrays[i].data = NULL;
             arrays[i].allocated = false;
+        }
+    }
+    for (i = 0; i < MAX_VARS; i++) {
+        if (string_variables[i]) {
+            free(string_variables[i]);
+            string_variables[i] = NULL;
         }
     }
 }
@@ -266,7 +280,23 @@ void execute_print(void) {
                 printf("%s", str);
             }
         } else {
-            printf("%d", parse_expression());
+            bool is_string_var = false;
+            char *save_pos = current_pos;
+            if (isalpha(*current_pos)) {
+                 current_pos++;
+                 if (*current_pos == '$') {
+                     is_string_var = true;
+                     char var_name = toupper(*save_pos);
+                     current_pos++; /* Skip $ */
+                     int idx = var_name - 'A';
+                     if (string_variables[idx]) printf("%s", string_variables[idx]);
+                 }
+            }
+
+            if (!is_string_var) {
+                current_pos = save_pos;
+                printf("%d", parse_expression());
+            }
         }
         
         skip_whitespace();
@@ -406,37 +436,53 @@ void execute_input(void) {
         char var_name = toupper(*current_pos);
         current_pos++;
 
-        int *target = NULL;
-
-        skip_whitespace();
-        if (*current_pos == '[' || *current_pos == '(') {
-            char closing = (*current_pos == '[') ? ']' : ')';
+        bool is_string = false;
+        if (*current_pos == '$') {
+            is_string = true;
             current_pos++;
-            int index = parse_expression();
-            skip_whitespace();
-            if (*current_pos == closing) {
-                current_pos++;
-            }
-
-            int arr_idx = var_name - 'A';
-            if (!arrays[arr_idx].allocated) {
-                fprintf(stderr, "Error: Array %c not dimensioned\n", var_name);
-                return;
-            }
-            if (index < 0 || index >= arrays[arr_idx].size) {
-                fprintf(stderr, "Error: Array index %d out of bounds for %c\n", index, var_name);
-                return;
-            }
-            target = &arrays[arr_idx].data[index];
-        } else {
-            target = &variables[var_name - 'A'];
         }
 
-        if (target) {
-            if (scanf("%d", target) != 1) {
-                fprintf(stderr, "Error: Invalid input\n");
-                while(getchar() != '\n' && !feof(stdin));
-                return;
+        int *target = NULL;
+
+        if (is_string) {
+            char buffer[MAX_LINE_LENGTH];
+            if (scanf("%255s", buffer) == 1) { /* 255 must be MAX_LINE_LENGTH - 1 */
+                int idx = var_name - 'A';
+                if (string_variables[idx]) free(string_variables[idx]);
+                string_variables[idx] = (char *)malloc(strlen(buffer) + 1);
+                if (string_variables[idx]) strcpy(string_variables[idx], buffer);
+            }
+        } else {
+            skip_whitespace();
+            if (*current_pos == '[' || *current_pos == '(') {
+                char closing = (*current_pos == '[') ? ']' : ')';
+                current_pos++;
+                int index = parse_expression();
+                skip_whitespace();
+                if (*current_pos == closing) {
+                    current_pos++;
+                }
+
+                int arr_idx = var_name - 'A';
+                if (!arrays[arr_idx].allocated) {
+                    fprintf(stderr, "Error: Array %c not dimensioned\n", var_name);
+                    return;
+                }
+                if (index < 0 || index >= arrays[arr_idx].size) {
+                    fprintf(stderr, "Error: Array index %d out of bounds for %c\n", index, var_name);
+                    return;
+                }
+                target = &arrays[arr_idx].data[index];
+            } else {
+                target = &variables[var_name - 'A'];
+            }
+
+            if (target) {
+                if (scanf("%d", target) != 1) {
+                    fprintf(stderr, "Error: Invalid input\n");
+                    while(getchar() != '\n' && !feof(stdin));
+                    return;
+                }
             }
         }
 
