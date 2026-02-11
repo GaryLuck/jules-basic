@@ -1081,7 +1081,7 @@ int main(void) {
     
     printf("Tiny BASIC Interpreter\n");
     printf("Commands: NEW, LIST, RUN, LOAD <file>, SAVE <file>, QUIT\n");
-    printf("Statements: PRINT, LET, GOTO, IF, DIM, END\n\n");
+    printf("Statements: PRINT, LET, GOTO, IF, DIM, END, FOR, NEXT\n\n");
     
     while (1) {
         printf("> ");
