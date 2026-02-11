@@ -145,6 +145,37 @@ int parse_factor(void) {
     }
     
     if (isalpha(*current_pos)) {
+        if (strncasecmp(current_pos, "INSTR", 5) == 0) {
+            current_pos += 5;
+            skip_whitespace();
+            if (*current_pos == '(') {
+                current_pos++;
+                char *haystack = parse_string_operand();
+                skip_whitespace();
+                if (*current_pos == ',') {
+                    current_pos++;
+                    char *needle = parse_string_operand();
+                    skip_whitespace();
+                    if (*current_pos == ')') {
+                        current_pos++;
+                        int result = 0;
+                        if (haystack && needle) {
+                            char *found = strstr(haystack, needle);
+                            if (found) {
+                                result = (int)(found - haystack) + 1;
+                            }
+                        }
+                        if (haystack) free(haystack);
+                        if (needle) free(needle);
+                        return result;
+                    }
+                    if (needle) free(needle);
+                }
+                if (haystack) free(haystack);
+            }
+            return 0;
+        }
+
         char var_name = toupper(*current_pos);
         current_pos++;
         skip_whitespace();
@@ -275,29 +306,14 @@ void execute_print(void) {
         }
         first = false;
         
-        if (*current_pos == '"') {
-            char *str = read_string_literal();
-            if (str) {
-                printf("%s", str);
-            }
+        char *save_pos = current_pos;
+        char *str = parse_string_operand();
+        if (str) {
+            printf("%s", str);
+            free(str);
         } else {
-            bool is_string_var = false;
-            char *save_pos = current_pos;
-            if (isalpha(*current_pos)) {
-                 current_pos++;
-                 if (*current_pos == '$') {
-                     is_string_var = true;
-                     char var_name = toupper(*save_pos);
-                     current_pos++; /* Skip $ */
-                     int idx = var_name - 'A';
-                     if (string_variables[idx]) printf("%s", string_variables[idx]);
-                 }
-            }
-
-            if (!is_string_var) {
-                current_pos = save_pos;
-                printf("%d", parse_expression());
-            }
+            current_pos = save_pos;
+            printf("%d", parse_expression());
         }
         
         skip_whitespace();
@@ -321,6 +337,28 @@ void execute_let(void) {
     char var_name = toupper(*current_pos);
     current_pos++;
     skip_whitespace();
+
+    if (*current_pos == '$') {
+        current_pos++;
+        skip_whitespace();
+        if (*current_pos == '=') {
+            current_pos++;
+        }
+        char *val = parse_string_operand();
+        int idx = var_name - 'A';
+        if (string_variables[idx]) {
+            free(string_variables[idx]);
+            string_variables[idx] = NULL;
+        }
+        if (val) {
+            string_variables[idx] = val;
+        } else {
+             /* Assignment of empty or invalid string */
+            string_variables[idx] = (char *)malloc(1);
+            if (string_variables[idx]) *string_variables[idx] = '\0';
+        }
+        return;
+    }
     
     /* Check for array assignment */
     if (*current_pos == '[' || *current_pos == '(') {
@@ -640,6 +678,107 @@ char *parse_string_operand(void) {
             if (ret) strcpy(ret, s);
             return ret;
         }
+    } else if (strncasecmp(current_pos, "LEFT$", 5) == 0) {
+        current_pos += 5;
+        skip_whitespace();
+        if (*current_pos == '(') {
+            current_pos++;
+            char *str = parse_string_operand();
+            skip_whitespace();
+            if (*current_pos == ',') {
+                current_pos++;
+                int n = parse_expression();
+                skip_whitespace();
+                if (*current_pos == ')') {
+                    current_pos++;
+                    char *ret = NULL;
+                    if (str) {
+                        int len = strlen(str);
+                        if (n < 0) n = 0;
+                        if (n > len) n = len;
+                        ret = (char *)malloc(n + 1);
+                        if (ret) {
+                            strncpy(ret, str, n);
+                            ret[n] = '\0';
+                        }
+                        free(str);
+                    }
+                    return ret;
+                }
+            }
+            if (str) free(str);
+        }
+    } else if (strncasecmp(current_pos, "RIGHT$", 6) == 0) {
+        current_pos += 6;
+        skip_whitespace();
+        if (*current_pos == '(') {
+            current_pos++;
+            char *str = parse_string_operand();
+            skip_whitespace();
+            if (*current_pos == ',') {
+                current_pos++;
+                int n = parse_expression();
+                skip_whitespace();
+                if (*current_pos == ')') {
+                    current_pos++;
+                    char *ret = NULL;
+                    if (str) {
+                        int len = strlen(str);
+                        if (n < 0) n = 0;
+                        if (n > len) n = len;
+                        ret = (char *)malloc(n + 1);
+                        if (ret) {
+                            strcpy(ret, str + (len - n));
+                        }
+                        free(str);
+                    }
+                    return ret;
+                }
+            }
+            if (str) free(str);
+        }
+    } else if (strncasecmp(current_pos, "MID$", 4) == 0) {
+        current_pos += 4;
+        skip_whitespace();
+        if (*current_pos == '(') {
+            current_pos++;
+            char *str = parse_string_operand();
+            skip_whitespace();
+            if (*current_pos == ',') {
+                current_pos++;
+                int start = parse_expression();
+                skip_whitespace();
+                if (*current_pos == ',') {
+                    current_pos++;
+                    int n = parse_expression();
+                    skip_whitespace();
+                    if (*current_pos == ')') {
+                        current_pos++;
+                        char *ret = NULL;
+                        if (str) {
+                            int len = strlen(str);
+                            if (start < 1) start = 1;
+                            if (start > len) {
+                                ret = (char *)malloc(1);
+                                if (ret) *ret = '\0';
+                            } else {
+                                int available = len - (start - 1);
+                                if (n < 0) n = 0;
+                                if (n > available) n = available;
+                                ret = (char *)malloc(n + 1);
+                                if (ret) {
+                                    strncpy(ret, str + (start - 1), n);
+                                    ret[n] = '\0';
+                                }
+                            }
+                            free(str);
+                        }
+                        return ret;
+                    }
+                }
+            }
+            if (str) free(str);
+        }
     } else if (isalpha(*current_pos)) {
          char *save_pos = current_pos;
          char var = toupper(*current_pos++);
@@ -670,24 +809,15 @@ void execute_if(void) {
     char *right_str = NULL;
     bool is_string_comp = false;
 
-    /* Check for string comparison */
-    if (*current_pos == '"') {
-        is_string_comp = true;
-    } else if (isalpha(*current_pos)) {
-        if (*(current_pos + 1) == '$') {
-            is_string_comp = true;
-        }
-    }
-
     int left_val = 0;
 
-    if (is_string_comp) {
-        left_str = parse_string_operand();
-        if (!left_str) {
-             /* Should not happen due to check above, unless memory fail */
-             return;
-        }
+    char *save_pos = current_pos;
+    left_str = parse_string_operand();
+
+    if (left_str) {
+        is_string_comp = true;
     } else {
+        current_pos = save_pos;
         left_val = parse_expression();
     }
 
